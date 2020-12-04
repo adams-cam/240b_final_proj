@@ -8,6 +8,8 @@
 .rds
 *.rds
 
+# txt
+*.txt
 
 # zipped
 *.gz
