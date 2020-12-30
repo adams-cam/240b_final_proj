@@ -150,8 +150,15 @@ missing_pp <- colMeans(is.na(gene_exp))
 hist(missing_pp)
 table(missing_pp)
 
-save(list = c("cov", "gene_exp"), 
-     #file = "final_proj.RData")
-     file = "data/clean_processed_data.RData")
+#save(list = c("cov", "gene_exp"), file = "~/Google Drive/01_semester_archive/11_Fall_2020/ph240b/final_project/final_proj.RData")
+stop()
+
+# use for 
+tmp <- fread("~/Downloads/GSE44001_non-normalzied.txt", fill = T) #%>% 
+dim(tmp)
+tmp[, 590:601]
+tmp %>% head
+  t() %>% data.frame()
+tmp %>% select(31, 33:38, 46) %>% head
 
 

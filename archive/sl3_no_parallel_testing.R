@@ -9,9 +9,9 @@ library(survival)
 library(skimr)
 library(scales)
 library(origami)
-library(future)
+#library(future)
 library(survtmle)
-#options(sl3.verbose = TRUE)
+options(sl3.verbose = TRUE)
 library(sl3)
 
 # set dplyr functions b/c of server issues 
@@ -21,7 +21,7 @@ mutate <- dplyr::mutate
 
 # load data
 db <- load(file = paste0(#"~/Google Drive/01_semester_archive/11_Fall_2020/ph240b/", 
-  "data/final_proj.RData"))
+  "~/repos/240b_final_proj/final_proj.RData"))
 db
 
 dim(cov)
@@ -140,7 +140,7 @@ with(dat, table(y, status))
 
 #options(sl3.verbose = TRUE)
 # set sl3 task
-genes <- grep("ILMN", colnames(dat), value = T)#[1:300]
+genes <- grep("ILMN", colnames(dat), value = T)
 length(genes)
 head(genes)
 dat_task <- make_sl3_Task(
@@ -175,7 +175,7 @@ lrnr_lasso <- make_learner(Lrnr_glmnet) # alpha default is 1
 lrnr_ridge <- make_learner(Lrnr_glmnet, alpha = 0)
 lrnr_elasticnet <- make_learner(Lrnr_glmnet, alpha = .5)
 lrnr_gam <- make_learner(Lrnr_gam)
-lrnr_polspline <- make_learner(Lrnr_polspline)
+#lrnr_polspline <- make_learner(Lrnr_polspline)
 
 # set stack
 stack <- make_learner(
@@ -191,11 +191,12 @@ stack <- make_learner(
   xgb_learners[[26]], xgb_learners[[27]], xgb_learners[[28]], xgb_learners[[29]], xgb_learners[[30]]
   )
 
+
+# simple learner
 stack <- make_learner(
   Stack, 
   lrnr_glm, lrnr_mean, lrnr_ridge, lrnr_lasso, lrnr_elasticnet
 )
-
 
 # screeners --------
 screen_rf <- make_learner(Lrnr_screener_randomForest, #nVar = 20, ntree = 20)
@@ -206,7 +207,7 @@ screen_lasso <- make_learner(Lrnr_glmnet)
 
 # add screener to pipline
 screener_pipeline <- make_learner(Pipeline, 
-                                  #screen_lasso,
+                                  screen_lasso,
                                   screen_rf, 
                                   stack)
 
@@ -216,20 +217,19 @@ fancy_stack <- make_learner(Stack, screener_pipeline, stack)
 # set sl
 sl <- Lrnr_sl$new(
   learners = fancy_stack,
-  #learners = dt_stack,
   loss = loss_loglik_binomial
 )
 
-availableCores() 
-options(future.fork.enable = FALSE) ## automatically set in RStudio
+#availableCores() 
+#options(future.fork.enable = FALSE) ## automatically set in RStudio
 #supportsMulticore()
 #plan(multiprocess)
 #f <- future(1)
 #class(f)
 #f <- future(Sys.getpid())
 #value(f)
-Sys.getpid()
-plan(multiprocess, workers = 8)
+#Sys.getpid()
+#plan(multiprocess, workers = 8)
 options(sl3.verbose = TRUE)
 sl_fit <- sl$train(dat_task)
 print("#### initial SL fit complete ####")
@@ -238,16 +238,16 @@ sl_fit$predict() %>% summary()
 sl_fit$learner_fits$`Pipeline(Lrnr_screener_randomForest_20_200->Stack)`
 
 
- #save(sl_fit, file = "/my/home/cadams/240b_final_proj/data/sl3_parallel_testing.RData")
+#save(sl_fit, file = "/my/home/cadams/240b_final_proj/data/sl3_parallel_testing.RData")
 
-save.image(file = "/my/home/cadams/240b_final_proj/data/sl3_parallel_testing.RData")
+save.image(file = "~/repos/240b_final_proj/data/sl3_no_parallel_testing.RData")
 print("#### save 1 ####")
 
 # cross validate
 CV_sl_fit <- CV_lrnr_sl(sl_fit, dat_task, loss_loglik_binomial)
 print("#### CV sl fit complete ####")
-
-save.image(file = "/my/home/cadams/240b_final_proj/data/sl3_parallel_testing.RData")
+save(CV_sl_fit, 
+     file = "~/repos/240b_final_proj/data/sl3_cv_no_parallel_testing.RData")
 
 print("#### save 2 ####")
 
@@ -268,4 +268,4 @@ varimp(sl_fit)
 
 # Seccond task is to use ----------------------------
 
-# nohup R CMD BATCH --slave sl3_parallel_testing.R & 
+# nohup R CMD BATCH --vanilla sl3_no_parallel_testing.R & 

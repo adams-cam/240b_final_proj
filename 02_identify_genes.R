@@ -1,4 +1,9 @@
 
+
+# to run
+# nohup R CMD BATCH --vanilla 02_identify_genes.R & 
+
+
 rm(list=ls())
 
 
@@ -21,7 +26,7 @@ mutate <- dplyr::mutate
 
 # load data
 db <- load(file = paste0(#"~/Google Drive/01_semester_archive/11_Fall_2020/ph240b/", 
-  "data/final_proj.RData"))
+  "~/repos/240b_final_proj/final_proj.RData"))
 db
 
 dim(cov)
@@ -32,23 +37,13 @@ dim(gene_exp)
 #-------------------------------------------------------------------------------
 # Set up data
 #-------------------------------------------------------------------------------
-
-#cov <- cov %>%
-#  mutate(disease_free_survival_months = round(scales::rescale(disease_free_survival_months, c(1, 150)), 0),
-#    survival_120_months = ifelse(disease_free_survival_months > 120, 120, 
-#                                 disease_free_survival_months),
-#    status_120_months = ifelse(disease_free_survival_months < 120 & status_of_dfs == 2, 
-#                          1, 0))
-#summary(cov$disease_free_survival_months)
-#with(cov, table(status_of_dfs, status_120_months))                                 
+                     
 
 
 dat <- cov %>% mutate(id = paste0("ID", 1:nrow(.)), 
                       status = as.integer(status_of_dfs-1),
-                      #ftype = status_of_dfs-1, # 1 = recurrence, 0 no reccurence
                       ftype = status, # 1 = recurrence, 0 no reccurence
                       time = disease_free_survival_months,
-                      #time = survival_120_months,
                       ftime = time, 
                       cancer_stage = as.factor(cancer_stage), 
                       largest_diameter = as.integer(largest_diameter)) %>% 
@@ -72,10 +67,6 @@ cv_km <- function(fold) {
   
   train_data <- training(dat)
   valid_data <- validation(dat)
-  
-  #train_data <- dat %>% sample_n(nrow(.)*.9)
-  #valid_data <- dat %>% sample_frac(0.1)
-  #data <- dat
   
   # fit KM
   mod <- survfit(Surv(ftime, ftype==0) ~ 0, data = train_data)
@@ -138,7 +129,6 @@ with(dat, table(y, status))
 # First task is to perform variable selection for ------------------------------
 # gene expression values
 
-#options(sl3.verbose = TRUE)
 # set sl3 task
 genes <- grep("ILMN", colnames(dat), value = T)
 length(genes)
@@ -163,10 +153,6 @@ grid <- expand.grid(grid_params, KEEP.OUT.ATTRS = FALSE)
 params_default <- list(nthread = getOption("sl.cores.learners", 1))
 xgb_learners <- apply(grid, MARGIN = 1, function(params_tune) {
   do.call(Lrnr_xgboost$new, c(params_default, as.list(params_tune)))})
-  
-# caret learner
-#lrnr_caret_xgboost <- make_learner(Lrnr_caret, algorithm = "xgboost", 
-#                                   tuneLength = 5)
 
 # other learners
 lrnr_glm <- make_learner(Lrnr_glm)
@@ -175,15 +161,13 @@ lrnr_lasso <- make_learner(Lrnr_glmnet) # alpha default is 1
 lrnr_ridge <- make_learner(Lrnr_glmnet, alpha = 0)
 lrnr_elasticnet <- make_learner(Lrnr_glmnet, alpha = .5)
 lrnr_gam <- make_learner(Lrnr_gam)
-lrnr_polspline <- make_learner(Lrnr_polspline)
+#lrnr_polspline <- make_learner(Lrnr_polspline)
 
 # set stack
 stack <- make_learner(
   Stack, 
   lrnr_glm, lrnr_mean, lrnr_ridge, lrnr_lasso, lrnr_elasticnet,
-  #lrnr_gam, lrnr_polspline,
-  xgb_learners[[1]], xgb_learners[[2]], xgb_learners[[3]], xgb_learners[[4]], xgb_learners[[5]]
-  ,
+  xgb_learners[[1]], xgb_learners[[2]], xgb_learners[[3]], xgb_learners[[4]], xgb_learners[[5]],
   xgb_learners[[6]], xgb_learners[[7]], xgb_learners[[8]], xgb_learners[[9]], xgb_learners[[10]],
   xgb_learners[[11]], xgb_learners[[12]], xgb_learners[[13]], xgb_learners[[14]], xgb_learners[[15]],
   xgb_learners[[16]], xgb_learners[[17]], xgb_learners[[18]], xgb_learners[[19]], xgb_learners[[20]],
@@ -220,52 +204,30 @@ sl <- Lrnr_sl$new(
   loss = loss_loglik_binomial
 )
 
-#availableCores() 
-#options(future.fork.enable = FALSE) ## automatically set in RStudio
+availableCores() 
+options(future.fork.enable = FALSE) ## automatically set in RStudio
 #supportsMulticore()
-#plan(multiprocess)
-#f <- future(1)
-#class(f)
-#f <- future(Sys.getpid())
-#value(f)
-#Sys.getpid()
-#plan(multiprocess, workers = 8)
+Sys.getpid()
+plan(multiprocess, workers = 8)
 options(sl3.verbose = TRUE)
 sl_fit <- sl$train(dat_task)
 print("#### initial SL fit complete ####")
 
 sl_fit$predict() %>% summary()
-sl_fit$learner_fits$`Pipeline(Lrnr_screener_randomForest_20_200->Stack)`
 
 
-#save(sl_fit, file = "/my/home/cadams/240b_final_proj/data/sl3_parallel_testing.RData")
 
-save.image(file = "/my/home/cadams/240b_final_proj/data/sl3_parallel_testing.RData")
+save.image(file = "~/repos/240b_final_proj/data/sl3_no_parallel_testing.RData")
 print("#### save 1 ####")
 
 # cross validate
 CV_sl_fit <- CV_lrnr_sl(sl_fit, dat_task, loss_loglik_binomial)
 print("#### CV sl fit complete ####")
-
-save.image(file = "/my/home/cadams/240b_final_proj/data/sl3_parallel_testing.RData")
+save(CV_sl_fit, 
+     file = "~/repos/240b_final_proj/data/sl3_cv_no_parallel_testing.RData")
 
 print("#### save 2 ####")
 
 
 stop()
 
-
-dt_sl <- delayed_learner_train(sl, dat_task)
-dt_sl <- delayed_learner_train(sl_fit, dat_task)
-
-plot(dt_sl, color = FALSE, height = "400px", width = "90%")
-dt_sl$compute()
-
-# Variable importance for sl_fit
-varimp(sl_fit)
-
-
-
-# Seccond task is to use ----------------------------
-
-# nohup R CMD BATCH --vanilla sl3_parallel_testing.R & 
